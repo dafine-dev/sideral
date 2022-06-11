@@ -1,5 +1,6 @@
 from __future__ import annotations
 from sideral.errors import UnloadedIterator
+from typing import Generic, TypeVar
 
 def decorator(callable):
     return callable
@@ -26,8 +27,8 @@ class _Unloaded:
 
 
 
-
-class ordered_set:
+T = TypeVar('T')
+class ordered_set(Generic[T]):
     
     def __init__(self, *items) -> None:
         self._items = {}
@@ -45,7 +46,7 @@ class ordered_set:
         self._index = -1
         return self
     
-    def __next__(self) -> any:
+    def __next__(self) -> T:
         self._index += 1
 
         if self._index > len(self._hashs) - 1:
@@ -77,25 +78,6 @@ class ordered_set:
             
 
 
-class hash_map:
-    
-    def __init__(self) -> None:
-        self._map = {}
-
-    def __contains__(self, item: any) -> bool:
-        return hash(item) in self._map
-    
-    def __getitem__(self, index: any) -> any:
-        return self._map[hash(index)]
-    
-    def __setitem__(self, index: any, value: any) -> None:
-        self._map[hash(index)] = value
-    
-    def __delitem__(self, index: any) -> None:
-        del self._map[hash(index)]
-    
-    def values(self):
-        return self._map.values()
     
 
 abstract = decorator

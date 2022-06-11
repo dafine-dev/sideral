@@ -21,10 +21,10 @@ class Select(Query):
     def __init__(self) -> None:
         self._join = ''
         self._where = []
-        self._tables = hash_map()
+        self._tables = {}
         self._from_clause = ''
         self._order_by = ''
-        self._columns = hash_map()
+        self._columns = {}
         self.sub_queries = []
         self._index = 0
     
@@ -40,7 +40,7 @@ class Select(Query):
         return self
 
     def from_(self, table: Table) -> Select:
-        self._from_clause += f' from {table} as {self._add_table(table)} '
+        self._from_clause += f' from {table} as {self._add_table(table)}'
         return self
 
     def join(self, table: Table, on: SQLCondition, type: Join = Join.INNER) -> Select:
@@ -53,7 +53,9 @@ class Select(Query):
         return self
 
     def order_by(self, column: Column) -> Select:
-        self._order_by = f' order by {column.full_name} '
+        self._index = -1
+        self._order_by = f' order by {column.get_alias(self)}'
+        self._index = 0
         return self
 
     def defer(self, columns: Iterator[Column]) -> Select:
@@ -78,23 +80,24 @@ class Select(Query):
 
     @property
     def statement(self) -> str:
-        sql = ' select ' 
+        sql = 'select' 
 
         for columns in self._columns.values():
             for index, column in enumerate(columns):
                 self._index = index
                 sql += f' {column.get_alias(self)} as {column.alias},'
         
-        self._index = 0
+        self._index = -1
         sql = sql[:-1]
         sql += self._from_clause
         if self._where:
-            sql += ' where '
-            sql += ''.join(f'{condition.to_string(self)} and ' for condition in self._where)[:-4]
-        
+            sql += ' where'
+            sql += ''.join(f' {condition.to_string(self)} and' for condition in self._where)[:-4]
+
         sql += self._order_by
         sql +=  '; '
-        for query in self.sub_queries: sql += f'{query} ;'
+        for query in self.sub_queries: sql += f'{query};'
+        self._index = 0
         return sql 
 
 
@@ -102,6 +105,7 @@ class Insert(Query):
     
     def __init__(self) -> None:
         self._values = []
+        self._on_duplicate = False
 
     def into(self, table: Table) -> Insert:
         self._table = table
@@ -118,12 +122,12 @@ class Insert(Query):
     
     @property
     def statement(self) -> str:
-        sql = ' insert'
+        sql = 'insert'
         sql += f' into {self._table} ('
         sql += ''.join(f'{value[0]}, ' for value in self._values)[:-2]
         sql += ') values ('
         sql += ''.join(f'{format(value[1]) if value[1] not in (None, ...) else "default"}, ' for value in self._values)[:-2]
-        sql += ') '
+        sql += ')'
 
         if self._on_duplicate:
             sql += ' on duplicate key update '
@@ -154,9 +158,10 @@ class Update(Query):
     def statement(self) -> str:
         sql = f'update {self._table} set '
         sql += ''.join(f'{column[0] == column[1]}, ' for column in self._columns)[:-2]
-        sql += ' where '
-        #add criteria class
-        sql += ''.join(f'{condition} and ' for condition in self._where)[:-4]
+
+        if self._where:
+            sql += ' where'
+            sql += ''.join(f' {condition} and' for condition in self._where)[:-4]
         sql += '; '
         return sql
 
@@ -178,14 +183,15 @@ class Delete(Query):
     @property
     def statement(self) -> str:
         sql = 'delete '
-        sql += f'from {self._from} where '
-        #add criteria class
-        sql += ''.join(f'{condition} and ' for condition in self._where)[:-4]
+        sql += f'from {self._from}'
+
+        if self._where:
+            sql += ' where'
+            sql += ''.join(f' {condition} and' for condition in self._where)[:-4]
         sql += '; '
         return sql
 
 
-from sideral.utils import hash_map
 from sideral.schema import Table, Column
 from .utils import format
 from .condition import SQLCondition

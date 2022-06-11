@@ -14,12 +14,15 @@ _return = TypeVar('_return')
 @abstract
 class relationship(annotation):
 
-    def __init__(self, function: Callable[_params, _return] = None, mapping: str = None, master: bool = False, load:  load =  load.LAZY) -> None:
+    def __init__(self, function: Callable[_params, _return] = None, mapping: str = None, master: bool = False, load: load =  load.LAZY) -> None:
         super().__init__(function, mapping = mapping, master = master, _join_column = None, load = load)
 
     @property
     def reference(self) -> type:
         return get_type_hints(self.get)['return']
+    
+    def setup(self) -> None:
+        ...
 
 
 
@@ -41,7 +44,7 @@ class one_to_many(relationship):
             return default_join_column
 
 
-    def map(self) -> None:
+    def setup(self) -> None:
         model = Model(self.owner)
         reference = Model(self.reference)
         
@@ -58,9 +61,11 @@ class one_to_many(relationship):
             mapping = self.mapping,
             table = model.table,
             join_column = fk,
-            master = self.master
         )
         model.add_relationship(relationship)
+        
+        if self.master:
+            InsertEntityEvent(model).add_listener(PersistAssociationEventListener(relationship))
 
 
 
@@ -82,7 +87,7 @@ class many_to_one(relationship):
             return default_join_column
     
 
-    def map(self) -> None:
+    def setup(self) -> None:
         model = Model(self.owner)
         reference = Model(self.reference)
 
@@ -99,24 +104,27 @@ class many_to_one(relationship):
             mapping = self.mapping,
             table = model.table,
             join_column = fk,
-            master = self.master
         )
+
+        if not self.master:
+            relationship.owner = False
+
         model.add_relationship(relationship)
 
 
 
 class one_to_one(relationship):
  
-    def __init__(self, function: Callable[_params, _return] = None, mapping: str = None, master: bool = False, load:  load =  load.LAZY, owner: bool = False) -> None:
+    def __init__(self, function: Callable[_params, _return] = None, mapping: str = None, master: bool = False, load: load =  load.LAZY, owner: bool = False) -> None:
         super().__init__(function, mapping, master, load)
         self._join_owner = owner
 
-    def __set_name__(self, owner: type, name: str) -> None:
-        super().__set_name__(owner, name)
-        try:
-            self._join_owner = not getattr(self.reference, self.mapping)
-        except (ReferenceNotInstantiated, TypeError):
-            self._join_owner = self._join_owner
+    # def __set_name__(self, owner: type, name: str) -> None:
+    #     super().__set_name__(owner, name)
+    #     try:
+    #         self._join_owner = not getattr(self.reference, self.mapping)
+    #     except (ReferenceNotInstantiated, TypeError):
+    #         self._join_owner = self._join_owner
 
     @property
     def reference(self) -> type:
@@ -133,7 +141,7 @@ class one_to_one(relationship):
         except TypeError:
             return default_join_column
         
-    def map(self) -> None:
+    def setup(self) -> None:
         model = Model(self.owner)
         reference = Model(self.reference)
 
@@ -151,7 +159,6 @@ class one_to_one(relationship):
                 mapping = self.mapping,
                 table = model.table,
                 join_column = fk,
-                master = self.master
             )
         else:
             reference.table.add_column(column)
@@ -163,11 +170,13 @@ class one_to_one(relationship):
                 mapping = self.mapping,
                 table = model.table,
                 join_column = fk,
-                master = self.master
             )
 
+            if self.master:
+                InsertEntityEvent(model).add_listener(PersistAssociationEventListener(relationship))
+
         model.add_relationship(relationship)
-        
+
 
 
 
@@ -212,7 +221,7 @@ class many_to_many(relationship):
         except TypeError:
             return default_counter_join_column
 
-    def map(self) -> None:
+    def setup(self) -> None:
         model = Model(self.owner)
         reference = Model(self.reference)
 
@@ -238,11 +247,12 @@ class many_to_many(relationship):
             join_column = fk,
             secondary_table = join_table,
             secondary_join_column = counter_fk,
-            master = self.master
         )
 
         model.add_relationship(relationship)
-        
+
+        if self.master:
+            InsertEntityEvent(model).add_listener(PersistAssociationEventListener(relationship)) 
 
 
 from sideral.mapper import Model
@@ -251,3 +261,4 @@ from sideral.schema import Table
 from sideral.schema import Column
 from sideral.schema import ForeignKey
 from sideral.errors import ReferenceNotInstantiated
+from sideral.event import InsertEntityEvent, PersistAssociationEventListener

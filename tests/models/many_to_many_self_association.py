@@ -1,9 +1,47 @@
 from __future__ import annotations
-from sideral import entity, id, column, join_table, join, counter_join, many_to_many
+from .test_info import test_info
+from sideral import entity
+from sideral import id
+from sideral import column
+from sideral import join
+from sideral import counter_join
+from sideral import join_table
+from sideral import many_to_many
+from sideral import load
 
 
 @entity
 class Account:
+
+    __test_schema__ = ['id', 'username']
+
+    __test_columns__ = [
+        test_info(attribute_name = 'id', strategy = load.EAGER, column = 'id'),
+        test_info(attribute_name = 'username', strategy = load.EAGER, column = 'username'),
+    ]
+
+    __test_relationships__ = [
+        test_info(
+            attribute_name = 'followers',
+            strategy = load.LAZY,
+            mapping = 'following',
+            column = 'id_account',
+            second_column = 'id_follower',
+            second_table = 'Follow',
+            type = 'ToMany',
+            reference = 'Account'
+        ),
+        test_info(
+            attribute_name = 'following',
+            strategy = load.LAZY,
+            mapping = 'followers',
+            column = 'id_follower',
+            second_column = 'id_account',
+            second_table = 'Follow',
+            type = 'ToMany',
+            reference = 'Account'
+        )
+    ]
     
     def __init__(self, id: int = ..., username: str = ..., followers: list[Account] = ..., following: list[Account] = ...) -> None:
         self._id = id

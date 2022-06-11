@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-
 if TYPE_CHECKING:
     from .mapper import Model, Relationship
 
@@ -19,6 +18,10 @@ class Persister:
         return (
             self._model.build_insert()
             .values((column.column, column.get_attribute(element)) for column in self._model.columns(with_base = False))
+            .values((relationship.join_column.column, relationship.get_key(element))
+                     for relationship in self._model.relationships(with_base = False) 
+                     if relationship.owner
+            )
         )
     
     def build_update(self, element: object) -> Update:
@@ -26,6 +29,10 @@ class Persister:
         return (
             self._model.build_update()
             .set((column.column, column.get_attribute(element)) for column in self._model.columns(with_base = False))
+            .set((relationship.join_column.column, relationship.get_key(element)) 
+                  for relationship in self._model.relationships(with_base = False) 
+                  if relationship.owner
+            )
             .where(primary_key == self._model.identifier.get_attribute(element))
         )
     
@@ -43,18 +50,10 @@ class Persister:
         if id_value is not None:
             setattr(element, self._model.identifier.attribute_name, id_value)
 
-        for relationship in self._model.relationships(with_base = False):
-            if relationship.master:
-                AssociationPersister(relationship, self._model).persist(element)
-
         return id_value
     
     def update(self, element: object) -> None:
         self._session.transaction.execute_query(self.build_update(element))
-
-        for relationship in self._model.relationships(with_base = False):
-            if relationship.master:
-                AssociationPersister(relationship, self._model).persist(element)
     
     def delete(self, element: object) -> None:
         self._session.transaction.execute_query(self.build_delete(element))
@@ -88,7 +87,6 @@ class SingleTablePersister(Persister):
                           .values((column.column, column.get_attribute(element)) for column in self._model.columns())
 
 
-
 class AssociationPersister:
 
     def __init__(self, relationship: Relationship, model: Model) -> None:
@@ -96,77 +94,89 @@ class AssociationPersister:
         self._relationship = relationship
         self._session = SessionFactory.get()
     
-    def build_insert(self, pk_value: any, key_value: any) -> Insert:
+    def build_insert(self, key: any) -> Insert:
         join_column = self._relationship.join_column.column
-        table = join_column.table
-        key_column = self._relationship.relative_key_column
-        return (
-            Insert()
-            .into(table)
-            .values([(join_column, pk_value), (key_column, key_value)])
-            .on_duplicate_key()
-        )
-    
-    def build_update(self, pk_value: any, key_value: any) -> None:
+        return Insert() \
+                .into(join_column.table) \
+                .values([
+                   (join_column, key) 
+                ]) \
+                .on_duplicate_key()
+
+    def build_update(self, key: any) -> Update:
         join_column = self._relationship.join_column.column
-        table = join_column.table
-        key_column = self._relationship.relative_key_column
-        return (
-            Update()
-            .table(table)
-            .set([(join_column, key_value)])
-            .where(key_column == pk_value)
-        )
-    
-    def build_delete(self, pk_value: any, key_value: any) -> None:
+        return Update() \
+                .table(join_column.table) \
+                .set([
+                    (join_column, key)
+                ])
+
+    def build_delete(self, key: any) -> Delete:
         join_column = self._relationship.join_column.column
-        table = join_column.table
-        key_column = self._relationship.relative_key_column
-        #add criteria class later
-        return (
-            Delete()
-            .from_(table)
-            .where(join_column == pk_value, key_column == key_value)
-        )
+        return Delete() \
+                .from_(join_column.table) \
+                .where(join_column == key)
 
-    def insert(self, pk_value: any, element: object) -> None:
-        key_value = self._relationship.reference.identifier.get_attribute(element)
-        sql = self.build_insert(pk_value, key_value) if self._relationship.is_many_to_many else self.build_update(pk_value, key_value)    
-        self._session.transaction.execute_query(sql)
-    
-    def delete(self, pk_value: any, element: object) -> None:
-        key_value = self._relationship.reference.identifier.get_attribute(element)
-        sql = self.build_delete(pk_value, key_value) if self._relationship.is_many_to_many else self.build_update(pk_value, None)
-        self._session.transaction.execute_query(sql)
+    def save(self, element: object, key: any) -> None:
+        sql = ...
+        pk = self._relationship.reference.identifier.get_attribute(element)
 
-    def persist(self, element: object) -> None:
-        elements = self._relationship.get_attribute(element)
-
-        if not hasattr(elements, '__iter__'):
-            elements = set() if elements in (None, ...) else set([elements])
+        if self._relationship.is_many_to_many:
+            column = self._relationship.secondary_join_column.column
+            sql = self.build_insert(key) \
+                    .values([(column, pk)])
         else:
-            elements = set(elements)
+            column = self._relationship.reference.table.primary_key.column
+            sql = self.build_update(key) \
+                    .where(column == pk)
 
-        pk_value = self._model.identifier.get_attribute(element)
+        self._session.transaction.execute_query(sql)
 
-        self._session.clear_result()
+    def delete(self, element: object, key: any) -> None:
+        sql = ...
+        pk = self._relationship.reference.identifier.get_attribute(element)
         
-        self._session.transaction.execute_query(self._relationship.build_select(id = pk_value))
+        if self._relationship.is_many_to_many:
+            column = self._relationship.secondary_join_column.column
+            sql = self.build_delete(key) \
+                    .where(column == pk)
+        else:
+            column = self._relationship.reference.table.primary_key.column
+            sql = self.build_update(key) \
+                    .where(column == pk)
         
-        persisted_elements = set(self._relationship._post_execute_action(self._session.get_result()))
+        self._session.transaction.execute_query(sql)
+    
+    def reset(self, key: any) -> None:
+        sql = self.build_delete(key) \
+                if self._relationship.is_many_to_many \
+                else self.build_update(None).where(self._relationship.join_column.column == key)
 
-        for element in elements.difference(persisted_elements):
-            self.insert(pk_value, element)
+        self._session.transaction.execute_query(sql)
 
+    def recreate(self, elements: list[object], key: any) -> None:
+        elements = set(elements)
+        persisted_elements = self.load_relationship(key)
+        
         for element in persisted_elements.difference(elements):
-            self.delete(pk_value, element)         
-
-    @property
-    def is_many_to_many(self) -> bool:
-        if self._relationship.secondary_table:
-            return True
+            self.delete(element, key)
+        
+        for element in elements.difference(persisted_elements):
+            self.save(element, key)
+    
+    def persist(self, elements: list[object], key: any) -> None:
+        if elements in (None, ..., []):
+            self.reset(key)
+        elif not hasattr(elements, '__iter__'):
+            self.recreate([elements], key)
         else:
-            return False
+            self.recreate(elements, key)
+    
+    def load_relationship(self, id: any) -> set:
+        self._session.clear_result()
+        self._session.transaction.execute_query(self._relationship.build_select(id = id))
+        
+        return set(self._relationship._post_execute_action(self._session.get_result()))     
 
 
 

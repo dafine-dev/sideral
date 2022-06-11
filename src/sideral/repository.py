@@ -1,6 +1,5 @@
 from __future__ import annotations
 from functools import wraps
-
 from .session import transaction
 from .session import SessionFactory
 from .session import Session
@@ -43,8 +42,10 @@ def repository(_class: type):
 
         return Repository
 
+    
     return wrapper
             
 
 
 from .mapper import Model
+from .event import InsertEntityEvent, PersistAssociationEventListener

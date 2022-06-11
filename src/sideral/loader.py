@@ -3,7 +3,7 @@ from .utils import UNLOADED
 from typing import Generator, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .result import ResultSet, Row
+    from .result import Row
     from .proxy import Proxy
     from .mapper import Model
     from .schema import Column
@@ -83,7 +83,7 @@ class Loader:
         try:
             return self._load()[0]
         except IndexError:
-            raise Exception(f"Can't find {self._model._class.__name__} register with id {id} in database.")
+            raise SideralException(f"Can't find {self._model._class.__name__} register with id {id} in database.")
     
     @classmethod
     def load_on(self, rows: Generator[Row], model: Model, key: Column) -> Generator[Proxy]:
@@ -130,3 +130,4 @@ class Loader:
 
 
 from .session import SessionFactory
+from .errors import SideralException

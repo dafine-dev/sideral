@@ -25,6 +25,17 @@ def _str(self) -> str:
 def _eq(self, other) -> bool:
     return self.__element__.__eq__(other)
 
+def _eq(self, other) -> bool:
+    _class = self.__class__.__bases__[0]
+    if isinstance(other, self.__class__.__bases__[0]):
+        for column in _class.__columns__:
+            if getattr(self, column) != getattr(other, column):
+                return False
+    else:
+        return False
+    
+    return True
+
 
 @metaclass
 class ProxyMeta(type):
@@ -47,7 +58,7 @@ class ProxyMeta(type):
                 '__getattr__': _getter,
                 '__setattr__': _setter,
                 '__str__': lambda self: str(self.__element__),
-                '__eq__': lambda self, other: self.__element__.__eq__(other),
+                '__eq__': _eq,
                 '__hash__': lambda self: self.__element__.__hash__()
             }            
 

@@ -60,6 +60,7 @@ class Column(Property):
 
 @abstract
 class Relationship(Property):
+    owner: bool = False
 
     def __init__(self, 
         reference: Model, 
@@ -68,15 +69,12 @@ class Relationship(Property):
         mapping: str, 
         table: Table, 
         join_column: ForeignKey,
-        master: bool = False
     ) -> None:
         super().__init__(attribute_name, strategy)
         self.reference = reference
         self.mapping = mapping
         self.table = table
         self.join_column = join_column
-        self.master = master
-        self._related = self.table == self.reference.table
     
     @property
     def relative_key_column(self) -> Column:
@@ -86,17 +84,17 @@ class Relationship(Property):
     def is_many_to_many(self) -> bool:
         return False
 
-    def build_select(self, id: any = ...) -> Select:
-        sql = self.reference.build_select()
-        if not self._related:
-            sql \
-            .columns(self.join_column.column) \
-            .join(self.table, type = Join.RIGHT, on = self.join_column.column == self.join_column.reference)
+    # def build_select(self, id: any = ...) -> Select:
+    #     sql = self.reference.build_select()
+    #     if not self._related:
+    #         sql \
+    #         .columns(self.join_column.column) \
+    #         .join(self.table, type = Join.RIGHT, on = self.join_column.column == self.join_column.reference)
 
-        if id is not ...:
-            sql.where(self.join_column.column == id)
+    #     if id is not ...:
+    #         sql.where(self.join_column.column == id)
         
-        return sql
+    #     return sql
 
     def _post_execute_action(self, result: ResultSet) -> Generator:
         return Loader.load_on(rows = result.main(), model = self.reference, key = self.join_column.column)
@@ -110,6 +108,13 @@ class ToOne(Relationship):
         if mirror and self.mapping:
             value.__class__.get_property(name = self.mapping).set_attribute(value, proxy) 
         return proxy
+    
+    def get_key(self, element: object) -> any:
+        referenced_element = getattr(element, self.attribute_name)
+        if referenced_element in (None, ...):
+            return None
+        else:
+            return self.reference.identifier.get_attribute(referenced_element)
 
 
 class ToMany(Relationship):
@@ -124,10 +129,9 @@ class ToMany(Relationship):
         mapping: str, table: Table, 
         join_column: ForeignKey,
         secondary_table: Table = None, 
-        secondary_join_column: ForeignKey = None, 
-        master: bool = False
+        secondary_join_column: ForeignKey = None,
     ) -> None:
-        super().__init__(reference, attribute_name, strategy, mapping, table, join_column, master)
+        super().__init__(reference, attribute_name, strategy, mapping, table, join_column)
         self.secondary_table = secondary_table
         self.secondary_join_column = secondary_join_column
 
@@ -177,7 +181,7 @@ class OneToOne(ToOne):
     def build_select(self, id: any = ...) -> Select:
         sql = self.reference.build_select() \
               .columns([self.join_column.column]) \
-              .join(self.table, type = Join.RIGHT, on = self.join_column.reference == self.join_column.column)
+              .join(self.table, type = Join.RIGHT, on = self.join_column.column == self.join_column.reference)
 
         if id is not ...:
             sql.where(self.join_column.column == id)
@@ -190,11 +194,12 @@ class OneToOne(ToOne):
     
 
 class ManyToOne(ToOne):
+    owner: bool = True
 
     def build_select(self, id: any = ...) -> Select:
         sql = self.reference.build_select() \
               .columns([self.join_column.column]) \
-              .join(self.table, type = Join.RIGHT, on = self.join_column.column == self.join_column.reference)
+              .join(self.table, type = Join.RIGHT, on = self.join_column.reference == self.join_column.column)
 
         if id is not ...:
             sql.where(self.table.primary_key.column == id)
@@ -204,6 +209,10 @@ class ManyToOne(ToOne):
     @property
     def relative_key_column(self) -> Column:
         return self.table.primary_key.column
+    
+    @property
+    def is_many_to_one(self) -> bool:
+        return True
 
 
 

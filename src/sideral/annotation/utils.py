@@ -1,6 +1,5 @@
 from collections.abc import Callable
 from typing import ParamSpec, TypeVar
-from functools import wraps
 
 Class = TypeVar('Class')
 _params = ParamSpec('_params')
@@ -41,7 +40,7 @@ def _hash(attribute_name: str) -> int:
 
 def _eq(self, other: any) -> bool:
     _class = self.__class__
-
+    
     if isinstance(other, _class):
         for column in _class.__columns__:
             try:
@@ -53,9 +52,6 @@ def _eq(self, other: any) -> bool:
         return False
 
     return True
-
-
-
 
 
 def _prepare_model_class(_class: type, sub_class: bool = False) -> None:

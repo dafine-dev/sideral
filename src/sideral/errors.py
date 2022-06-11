@@ -1,9 +1,9 @@
+class SideralException(Exception):
+    ...
 
-
-
-class ReferenceNotInstantiated(Exception):
+class ReferenceNotInstantiated(SideralException):
     ...
 
 
-class UnloadedIterator(Exception):
+class UnloadedIterator(SideralException):
     ...

@@ -69,7 +69,7 @@ class Column:
 
     __slots__ = 'name', 'table', 'auto_increment'
     
-    def __init__(self, name: str, auto_increment: bool) -> None:
+    def __init__(self, name: str, auto_increment: bool = False) -> None:
         self.name = name
         self.auto_increment = auto_increment
     

@@ -8,7 +8,7 @@
 <p>To begin, firstly, Sideral must be installed. To do it, use this command:</p>
 
 <div class = "code">
-<p>pip install sideral</p>
+<pre style = "text-aling: center;">pip install sideral</pre>
 </div>
 
 <p>Sideral was thought to be used in MVC (Model View Control) systems, so it's recommended that the application structure looks like this:</p>
@@ -343,7 +343,7 @@ class Book:<br>
         return self._authors<br>
 @entity
 class Author:<br>
-    @counter_join(column_name = "book_id') # previous name: 'id_book'
+    @counter_join(column_name = 'book_id') # previous name: 'id_book'
     @many_to_many(mapping = 'authors')
     def books(self) -> list[Book]:
         return self._books

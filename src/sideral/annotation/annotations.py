@@ -44,7 +44,7 @@ class annotation:
         self.set(obj, value)
     
     def __delete__(self, obj) -> None:
-        return self.delete(obj)
+        self.delete(obj)
 
     def getter(self, function: Callable[_params, _return]) -> annotation:
         self.get = function
@@ -139,7 +139,7 @@ def derived_key(_class: Class = None, name: str = None) -> Class:
     if _class is None:
         return partial(derived_key, name = name)
     
-    _prepare_model_class(_class, sub_class = True)
+    # _prepare_model_class(_class, sub_class = True)
     model = SubEntity(Model(_class))
     c = Column(name = name or f'id_{model.table.name}', auto_increment = False)
     model.table.add_column(c)

@@ -12,7 +12,7 @@ _return = TypeVar('_return')
 
 class column(annotation):
 
-    def __init__(self, function: Callable[_params, _return] = None, name: str = None, load:  load =  load.EAGER) -> None:
+    def __init__(self, function: Callable[_params, _return] = None, name: str = None, load: load = load.EAGER) -> None:
         annotation.__init__(self, function, _name = name, load = load)
     
     def __set_name__(self, owner: type, name: str) -> None:
@@ -47,7 +47,7 @@ class id(column):
         column = Column(name = self.name, auto_increment = self.auto_increment)
         model.table.add_column(column = column)
         model.table.primary_key = PrimaryKey(column = column)
-        model.identifier = properties.Column(attribute_name = self.attribute_name, strategy =  load.EAGER, column = column)
+        model.identifier = properties.Column(attribute_name = self.attribute_name, strategy = load.EAGER, column = column)
 
 
 from sideral.mapper import Model

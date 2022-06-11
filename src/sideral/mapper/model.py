@@ -65,7 +65,7 @@ class Model:
         except UnloadedIterator:
             self._relationships = []
             for a in vars(self._class).values():
-                if isinstance(a, relationships.relationship): a.map()
+                if isinstance(a, relationships.relationship): a.setup()
             return self.relationships()
 
     @property
@@ -377,6 +377,11 @@ class SubSingleTable(ModelDecorator):
     @property
     def base(self) -> Model:
         return Model(super()._class.__bases__[0])
+    
+    @property
+    def properties(self) -> Generator[properties.Property]:
+        for column in self.columns(): yield column
+        for relationship in self.relationships(): yield relationship
 
     @property
     def discriminator_value(self) -> any:
@@ -411,6 +416,9 @@ class SubSingleTable(ModelDecorator):
     def build_insert(self) -> Insert:
         sql = self.base.build_insert().values([(self.base.discriminator, self._discriminator_value)])
         return sql
+    
+    def build_delete(self) -> Delete:
+        return Delete().from_(self.table)
 
 
 from . import properties
