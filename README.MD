@@ -109,7 +109,7 @@ class Client:
 </div>
 
 <p>
-A table have its columns, some of them are mapped as attributes while others may not. Thus, Sideral has a <i>@column</i> annotation to manage this mapping, but it has a small catch. The <i>@column</i> works similarly to Python built-in decorator <i>@property</i>, so all to-column-mapped attributes must be private and define getter and setter functions. Consequently, an entity class should be written like this:
+A table has its columns, some of them are mapped as attributes while others may not. Thus, Sideral has a <i>@column</i> annotation to manage this mapping, but it has a small catch. The <i>@column</i> works similarly to Python built-in decorator <i>@property</i>, so all to-column-mapped attributes must be private and define getter and setter functions. Consequently, an entity class should be written like this:
 </p>
 
 <div class = "code">
